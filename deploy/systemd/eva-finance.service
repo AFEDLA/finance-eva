@@ -1,0 +1,24 @@
+[Unit]
+Description=EVA Finance Assistant — Holomoc AI Finance Agent (FastAPI)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/eva-finance/holomoc-bot
+EnvironmentFile=/var/www/eva-finance/.env
+ExecStart=/var/www/eva-finance/venv/bin/uvicorn api.main:app \
+    --host 127.0.0.1 \
+    --port 8081 \
+    --workers 1 \
+    --log-level info
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=eva-finance
+MemoryMax=1536M
+
+[Install]
+WantedBy=multi-user.target

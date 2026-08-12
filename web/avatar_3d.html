@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Admin Ola 3D — Holomoc Indonesia</title>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+    "talkinghead": "https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@1.7/modules/talkinghead.mjs"
+  }
+}
+</script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #0d0d1a;
+  color: #e0e0e0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.header {
+  background: linear-gradient(90deg, #1a1040 0%, #0d0d1a 100%);
+  border-bottom: 1px solid #2a1f5a;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 10;
+}
+.header-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #1D9E75;
+  box-shadow: 0 0 6px #1D9E75;
+  transition: all 0.4s;
+}
+.header-dot.talking { background: #a78bfa; box-shadow: 0 0 8px #a78bfa; }
+.header-dot.thinking { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; }
+.header-title { font-size: 15px; font-weight: 700; color: #fff; }
+.header-sub { font-size: 12px; color: #888; margin-left: auto; }
+
+.main { display: flex; flex: 1; overflow: hidden; }
+
+/* AVATAR PANEL */
+.avatar-panel {
+  width: 320px;
+  min-width: 280px;
+  background: #0a0a18;
+  border-right: 1px solid #1a1540;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+#avatar-canvas {
+  width: 100%;
+  flex: 1;
+}
+
+.avatar-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(0deg, rgba(10,10,24,1) 0%, rgba(10,10,24,0.8) 60%, transparent 100%);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.avatar-name { text-align: center; }
+.avatar-name .name { font-size: 17px; font-weight: 700; color: #e2d9f3; }
+.avatar-name .role { font-size: 11px; color: #7c6fa0; margin-top: 2px; }
+
+.status-badge {
+  font-size: 11px; padding: 5px 14px;
+  border-radius: 99px;
+  background: rgba(29,158,117,0.12);
+  color: #34d399;
+  border: 1px solid rgba(29,158,117,0.3);
+  transition: all 0.4s;
+  text-align: center;
+}
+.status-badge.talking {
+  background: rgba(167,139,250,0.15);
+  color: #c4b5fd;
+  border-color: rgba(167,139,250,0.4);
+}
+.status-badge.thinking {
+  background: rgba(245,158,11,0.12);
+  color: #fcd34d;
+  border-color: rgba(245,158,11,0.3);
+}
+
+.avatar-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.model-select {
+  width: 100%; font-size: 12px; padding: 6px 8px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px; color: #ccc; cursor: pointer;
+}
+
+.voice-select {
+  width: 100%; font-size: 12px; padding: 6px 8px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px; color: #ccc; cursor: pointer;
+}
+
+.slider-row {
+  display: flex; flex-direction: column; gap: 4px;
+}
+.slider-label {
+  font-size: 11px; color: #666;
+  display: flex; justify-content: space-between;
+}
+.auto-speak-row {
+  font-size: 11px; color: #777;
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+}
+
+/* CHAT PANEL */
+.chat-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+.quick-replies {
+  padding: 8px 20px 0;
+  display: flex; gap: 6px; flex-wrap: wrap;
+}
+.qr-btn {
+  font-size: 12px; padding: 5px 12px;
+  background: transparent;
+  border: 1px solid rgba(167,139,250,0.2);
+  border-radius: 99px; color: #7c6fa0; cursor: pointer;
+  transition: all 0.2s;
+}
+.qr-btn:hover { border-color: #a78bfa; color: #c4b5fd; background: rgba(167,139,250,0.08); }
+
+.messages {
+  flex: 1; overflow-y: auto; padding: 20px;
+  display: flex; flex-direction: column; gap: 16px;
+  scroll-behavior: smooth;
+}
+.messages::-webkit-scrollbar { width: 3px; }
+.messages::-webkit-scrollbar-thumb { background: #2a1f5a; border-radius: 2px; }
+
+.msg { display: flex; gap: 10px; max-width: 80%; }
+.msg.user { align-self: flex-end; flex-direction: row-reverse; }
+.msg.bot { align-self: flex-start; }
+
+.msg-avatar {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: #1a1040; border: 1px solid #2a1f5a;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; flex-shrink: 0;
+}
+
+.msg-bubble {
+  padding: 10px 14px; border-radius: 16px;
+  font-size: 14px; line-height: 1.65;
+  max-width: 100%; word-break: break-word;
+}
+.msg.user .msg-bubble {
+  background: linear-gradient(135deg, #312060 0%, #1e1050 100%);
+  border-radius: 16px 4px 16px 16px;
+  color: #e2d9f3;
+  border: 1px solid rgba(167,139,250,0.2);
+}
+.msg.bot .msg-bubble {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 4px 16px 16px 16px;
+  color: #e0e0e0;
+}
+.msg-time { font-size: 10px; color: #444; margin-top: 4px; }
+.msg.user .msg-time { text-align: right; }
+.msg-image-wrap { margin-bottom: 6px; display: flex; justify-content: flex-end; }
+.msg.bot .msg-image-wrap { justify-content: flex-start; }
+.msg-image {
+  max-width: 220px;
+  max-height: 220px;
+  border-radius: 12px;
+  border: 1px solid rgba(167,139,250,0.25);
+  object-fit: cover;
+  display: block;
+}
+.msg-file-chip {
+  display: inline-block;
+  margin-bottom: 6px;
+  padding: 6px 12px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  font-size: 12px;
+  color: #c4b5fd;
+}
+.skill-tag { font-size: 10px; color: #6b50a8; padding: 2px 0 6px 40px; }
+.download-link {
+  display: block;
+  width: fit-content;
+  margin: 4px 0 10px 40px;
+  padding: 8px 14px;
+  background: #4F46E5;
+  color: #fff;
+  border-radius: 8px;
+  font-size: 13px;
+  text-decoration: none;
+  font-weight: 500;
+}
+.download-link:hover { background: #4338CA; }
+
+.typing-indicator { display: none; align-self: flex-start; gap: 10px; }
+.typing-indicator.visible { display: flex; }
+.typing-dots {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 4px 16px 16px 16px;
+  padding: 12px 16px; display: flex; gap: 5px; align-items: center;
+}
+.typing-dots span {
+  width: 6px; height: 6px; background: #4a3a7a;
+  border-radius: 50%;
+  animation: tdot 1.2s ease-in-out infinite;
+}
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes tdot {
+  0%,60%,100% { transform: translateY(0); background: #4a3a7a; }
+  30% { transform: translateY(-7px); background: #a78bfa; }
+}
+
+.file-preview { padding: 6px 20px; display: none; }
+.file-preview.visible { display: flex; align-items: center; gap: 8px; }
+.file-chip {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(167,139,250,0.12);
+  border: 1px solid rgba(167,139,250,0.3);
+  border-radius: 8px; padding: 5px 10px;
+  font-size: 12px; color: #c4b5fd; max-width: 260px;
+}
+.file-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-chip-remove { background: none; border: none; color: #a78bfa; cursor: pointer; font-size: 14px; padding: 0; }
+.file-img-preview { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; }
+
+.error-msg { font-size: 12px; color: #f87171; padding: 4px 20px; display: none; }
+.error-msg.visible { display: block; }
+
+.input-area {
+  padding: 12px 20px; border-top: 1px solid #1a1540;
+  background: #0d0d1a; display: flex; gap: 8px; align-items: flex-end;
+}
+.upload-btn {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #888; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s; flex-shrink: 0;
+}
+.upload-btn:hover { background: rgba(167,139,250,0.15); border-color: #a78bfa; color: #c4b5fd; }
+.input-area textarea {
+  flex: 1; background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px; padding: 10px 14px;
+  font-size: 14px; color: #e0e0e0; resize: none; outline: none;
+  font-family: inherit; line-height: 1.5; max-height: 120px;
+  transition: border-color 0.2s;
+}
+.input-area textarea:focus { border-color: #a78bfa; }
+.input-area textarea::placeholder { color: #444; }
+.send-btn {
+  width: 42px; height: 42px; border-radius: 50%;
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  border: none; color: white; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity 0.2s, transform 0.1s; flex-shrink: 0;
+}
+.send-btn:hover { opacity: 0.85; }
+.send-btn:active { transform: scale(0.92); }
+.send-btn:disabled { background: #2a2a4a; cursor: not-allowed; }
+
+.loading-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(10,10,24,0.9);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 16px; z-index: 20;
+}
+.loading-spinner {
+  width: 40px; height: 40px; border: 3px solid rgba(167,139,250,0.2);
+  border-top-color: #a78bfa; border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 13px; color: #7c6fa0; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-dot" id="header-dot"></div>
+  <span class="header-title">Admin Ola 3D — Holomoc Indonesia</span>
+  <span class="header-sub" id="model-info">Menghubungkan...</span>
+</div>
+
+<div class="main">
+
+  <!-- AVATAR PANEL -->
+  <div class="avatar-panel">
+    <div class="loading-overlay" id="loading-overlay">
+      <div class="loading-spinner" id="loading-spinner"></div>
+      <div class="loading-text" id="loading-text">Memuat avatar 3D...</div>
+      <button id="start-btn" style="display:none;padding:10px 24px;background:linear-gradient(135deg,#7c3aed,#4f46e5);border:none;border-radius:99px;color:white;font-size:14px;cursor:pointer;margin-top:8px;">
+        ▶ Mulai Admin Ola
+      </button>
+    </div>
+    <div id="avatar-canvas"></div>
+    <div class="avatar-overlay">
+      <div class="avatar-name">
+        <div class="name">Admin Ola</div>
+        <div class="role">Holomoc Indonesia</div>
+      </div>
+      <div class="status-badge" id="status-badge">Siap membantu</div>
+      <div class="avatar-controls">
+        <select class="model-select" id="model-select" onchange="switchModel(this.value)">
+          <option value="avatars/brunette.glb">Brunette (Default)</option>
+          <option value="avatars/avaturn.glb">Avaturn</option>
+        </select>
+        <select class="voice-select" id="voice-select">
+          <option value="FGY2WhTYpPnrIDTdsKH5" selected>Gadis (Perempuan)</option>
+        </select>
+        <div class="slider-row">
+          <div class="slider-label">
+            <span>Kecepatan</span>
+            <span id="rate-val">1.0x</span>
+          </div>
+          <input type="range" min="0.6" max="1.6" step="0.1" value="1.0" id="rate-slider"
+            oninput="document.getElementById('rate-val').textContent=parseFloat(this.value).toFixed(1)+'x'"/>
+        </div>
+        <label class="auto-speak-row">
+          <input type="checkbox" id="auto-speak" checked/>
+          Auto bicara setiap jawaban
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHAT PANEL -->
+  <div class="chat-panel">
+    <div class="quick-replies">
+      <button class="qr-btn" onclick="sendQuick('Halo Ola, ada dokumen yang perlu diarsipkan hari ini')">Arsip dokumen</button>
+      <button class="qr-btn" onclick="sendQuick('Saya mau ajukan reimburse')">Reimburse</button>
+      <button class="qr-btn" onclick="sendQuick('Buatkan notulen rapat hari ini')">Notulen MoM</button>
+      <button class="qr-btn" onclick="sendQuick('Apa jadwal rapat hari ini?')">Jadwal rapat</button>
+      <button class="qr-btn" onclick="sendQuick('Tampilkan semua arsip dokumen')">Lihat arsip</button>
+    </div>
+
+    <div class="messages" id="messages">
+      <div class="msg bot">
+        <div class="msg-avatar">🤖</div>
+        <div>
+          <div class="msg-bubble">Halo! Saya Admin Ola, asisten administrasi Holomoc Indonesia. Avatar 3D saya sedang dimuat... Saya siap membantu arsip dokumen, keuangan, notulen rapat, dan jadwal!</div>
+          <div class="msg-time" id="init-time"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="typing-indicator" id="typing">
+      <div class="msg-avatar">🤖</div>
+      <div class="typing-dots"><span></span><span></span><span></span></div>
+    </div>
+
+    <div class="error-msg" id="error-msg">Tidak bisa terhubung ke server. Pastikan server jalan di localhost:8080</div>
+
+    <div class="file-preview" id="file-preview"></div>
+
+    <div class="input-area">
+      <input type="file" id="file-input" accept="image/*,.pdf,.xlsx,.xls,.docx,.doc,.txt,.csv" style="display:none" onchange="handleFileSelect(this)"/>
+      <button class="upload-btn" onclick="document.getElementById('file-input').click()" title="Lampirkan file">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+        </svg>
+      </button>
+      <textarea id="chat-input" placeholder="Ketik pesan untuk Ola..." rows="1"
+        onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+      <button class="send-btn" id="send-btn" onclick="sendMessage()" aria-label="Kirim">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { TalkingHead } from "talkinghead";
+
+const API_URL = 'http://localhost:8080';
+const SESSION_ID = 'holomoc-3d-' + Math.random().toString(36).substr(2, 9);
+
+let head = null;
+let isProcessing = false;
+let selectedFile = null;
+let isSpeaking = false;
+
+const headerDot = document.getElementById('header-dot');
+const statusBadge = document.getElementById('status-badge');
+const messagesEl = document.getElementById('messages');
+const typingEl = document.getElementById('typing');
+const errorEl = document.getElementById('error-msg');
+const sendBtn = document.getElementById('send-btn');
+const chatInput = document.getElementById('chat-input');
+const modelInfo = document.getElementById('model-info');
+const loadingOverlay = document.getElementById('loading-overlay');
+const voiceSelect = document.getElementById('voice-select');
+
+document.getElementById('init-time').textContent = getTime();
+
+function getTime() {
+  return new Date().toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' });
+}
+
+let currentModelUrl = 'avatars/brunette.glb';
+
+// Step 1: Tampilkan tombol START saat halaman pertama load
+// TalkingHead tidak boleh diinit sebelum user gesture!
+function showStartScreen() {
+  const loadingOverlay = document.getElementById('loading-overlay');
+  document.getElementById('loading-spinner').style.display = 'none';
+  document.getElementById('loading-text').textContent = 'Klik untuk memulai Admin Ola';
+  document.getElementById('start-btn').style.display = 'block';
+
+  document.getElementById('start-btn').onclick = () => initAvatar(currentModelUrl);
+}
+
+// Step 2: Init avatar SETELAH user klik (AudioContext aman)
+async function initAvatar(modelUrl = 'avatars/brunette.glb') {
+  currentModelUrl = modelUrl;
+  const loadingOverlay = document.getElementById('loading-overlay');
+  loadingOverlay.style.display = 'flex';
+  document.getElementById('loading-spinner').style.display = 'block';
+  document.getElementById('start-btn').style.display = 'none';
+  document.getElementById('loading-text').textContent = 'Memuat avatar 3D...';
+  document.getElementById('loading-text').style.color = '#7c6fa0';
+
+  try {
+    const nodeAvatar = document.getElementById('avatar-canvas');
+
+    if (head) {
+      try { head.stop(); } catch(e) {}
+      nodeAvatar.innerHTML = '';
+    }
+
+    // Init TalkingHead setelah user gesture - AudioContext aman
+    head = new TalkingHead(nodeAvatar, {
+      ttsEndpoint: null,
+      ttsApikey: null,
+      lipsyncModules: ['en'],
+      cameraView: 'upper',
+    });
+
+    await head.showAvatar({
+      // Cache-busting timestamp ditambahkan ke URL .glb supaya browser SELALU
+      // ambil versi terbaru dari server, bukan versi lama yang ter-cache —
+      // sebelumnya mengganti/menghapus file .glb di disk tidak terlihat efeknya
+      // sama sekali di avatar karena browser cache file besar sangat agresif.
+      url: modelUrl + (modelUrl.includes('?') ? '&' : '?') + 'v=' + Date.now(),
+      body: 'F',
+      avatarMood: 'neutral',
+      lipsyncLang: 'en',
+    }, (ev) => {
+      if (ev.lengthComputable) {
+        const pct = Math.round((ev.loaded / ev.total) * 100);
+        document.getElementById('loading-text').textContent = 'Memuat model... ' + pct + '%';
+      }
+    });
+
+    loadingOverlay.style.display = 'none';
+    setStatus('');
+
+    // Expose ke window dan cache mesh references
+    window.head = head;
+    cacheMorphMeshes();
+
+    // Log semua properti head untuk debug
+    console.log('=== HEAD PROPERTIES ===');
+    console.log('head keys:', Object.keys(head));
+    
+    // Cari scene/avatar object
+    const sceneObj = head.scene || head.avatar || head.group || head.model || head.object3D || head.root;
+    if (sceneObj) {
+      console.log('Found scene object:', sceneObj);
+      sceneObj.traverse(obj => {
+        if (obj.morphTargetDictionary && Object.keys(obj.morphTargetDictionary).length > 0) {
+          console.log('Mesh:', obj.name, '| MorphTargets:', Object.keys(obj.morphTargetDictionary));
+        }
+      });
+    } else {
+      // Coba semua properti yang mungkin berisi Object3D
+      for (const key of Object.keys(head)) {
+        try {
+          if (head[key] && typeof head[key].traverse === 'function') {
+            console.log('Found traversable at head.' + key);
+            head[key].traverse(obj => {
+              if (obj.morphTargetDictionary && Object.keys(obj.morphTargetDictionary).length > 0) {
+                console.log('Mesh:', obj.name, '| MorphTargets:', Object.keys(obj.morphTargetDictionary));
+              }
+            });
+          }
+        } catch(e) {}
+      }
+    }
+    console.log('=== END DEBUG ===');
+
+    setTimeout(() => {
+      playGreeting();
+    }, 300);
+
+  } catch(err) {
+    console.error('Avatar error:', err);
+    document.getElementById('loading-spinner').style.display = 'none';
+    document.getElementById('loading-text').textContent = 'Gagal memuat: ' + err.message;
+    document.getElementById('loading-text').style.color = '#f87171';
+    document.getElementById('start-btn').style.display = 'block';
+    document.getElementById('start-btn').textContent = '↺ Coba Lagi';
+    document.getElementById('start-btn').onclick = () => initAvatar(currentModelUrl);
+  }
+}
+
+async function switchModel(url) {
+  currentModelUrl = url;
+  if (head) {
+    await initAvatar(url);
+  }
+}
+
+function setStatus(state) {
+  headerDot.className = 'header-dot ' + (state || '');
+  statusBadge.className = 'status-badge ' + (state || '');
+  if (state === 'talking') statusBadge.textContent = 'Sedang berbicara...';
+  else if (state === 'thinking') statusBadge.textContent = 'Sedang memproses...';
+  else statusBadge.textContent = 'Siap membantu';
+}
+
+// ============================================================
+// MORPH TARGET SYSTEM
+// ============================================================
+let morphMeshes = [];
+
+function cacheMorphMeshes() {
+  morphMeshes = [];
+  if (!head || !head.scene) return;
+  head.scene.traverse(obj => {
+    if (obj.morphTargetDictionary && obj.morphTargetInfluences) {
+      morphMeshes.push(obj);
+    }
+  });
+  console.log('[LipSync] Cached', morphMeshes.length, 'meshes');
+  // Start idle animations setelah mesh siap
+  startIdleAnimations();
+}
+
+function setMorph(name, value, smooth = false) {
+  for (const mesh of morphMeshes) {
+    const i = mesh.morphTargetDictionary[name];
+    if (i !== undefined) mesh.morphTargetInfluences[i] = Math.max(0, Math.min(1, value));
+  }
+}
+
+function lerpMorph(name, target, speed = 0.15) {
+  for (const mesh of morphMeshes) {
+    const i = mesh.morphTargetDictionary[name];
+    if (i !== undefined) {
+      mesh.morphTargetInfluences[i] += (target - mesh.morphTargetInfluences[i]) * speed;
+    }
+  }
+}
+
+// Transisi morph target secara smooth dalam durasi tertentu (ms), dipakai untuk
+// pergantian ekspresi emosi agar tidak terlihat "patah" antar kalimat.
+const _activeMorphAnimations = new Map();
+function animateMorphTo(name, target, durationMs = 250) {
+  if (_activeMorphAnimations.has(name)) {
+    cancelAnimationFrame(_activeMorphAnimations.get(name));
+  }
+  const mesh = morphMeshes.find(m => m.morphTargetDictionary[name] !== undefined);
+  if (!mesh) return;
+  const idx = mesh.morphTargetDictionary[name];
+  const start = mesh.morphTargetInfluences[idx];
+  const startTime = performance.now();
+
+  function step(now) {
+    const t = Math.min(1, (now - startTime) / durationMs);
+    const eased = 1 - Math.pow(1 - t, 2); // ease-out
+    setMorph(name, start + (target - start) * eased);
+    if (t < 1) {
+      _activeMorphAnimations.set(name, requestAnimationFrame(step));
+    } else {
+      _activeMorphAnimations.delete(name);
+    }
+  }
+  _activeMorphAnimations.set(name, requestAnimationFrame(step));
+}
+
+function resetMouth() {
+  ['jawOpen','mouthOpen','mouthClose','mouthFunnel','mouthPucker',
+   'mouthSmileLeft','mouthSmileRight','mouthFrownLeft','mouthFrownRight',
+   'mouthStretchLeft','mouthStretchRight','mouthRollLower','mouthRollUpper',
+   'mouthShrugLower','mouthShrugUpper','mouthPressLeft','mouthPressRight',
+   'mouthLowerDownLeft','mouthLowerDownRight','mouthUpperUpLeft','mouthUpperUpRight',
+   'viseme_sil','viseme_PP','viseme_FF','viseme_TH','viseme_DD',
+   'viseme_kk','viseme_CH','viseme_SS','viseme_nn','viseme_RR',
+   'viseme_aa','viseme_E','viseme_I','viseme_O','viseme_U'
+  ].forEach(t => setMorph(t, 0));
+}
+
+// ============================================================
+// IDLE ANIMATIONS - biar avatar hidup saat diam
+// ============================================================
+let idleTimers = [];
+let blinkInterval = null;
+let idleHeadInterval = null;
+
+function startIdleAnimations() {
+  stopIdleAnimations();
+
+  // Blink setiap 3-6 detik
+  function doBlink() {
+    setMorph('eyeBlinkLeft', 1);
+    setMorph('eyeBlinkRight', 1);
+    setTimeout(() => {
+      setMorph('eyeBlinkLeft', 0);
+      setMorph('eyeBlinkRight', 0);
+    }, 120);
+    const next = 3000 + Math.random() * 3000;
+    blinkInterval = setTimeout(doBlink, next);
+  }
+  blinkInterval = setTimeout(doBlink, 2000);
+
+  // Senyum tipis saat idle
+  setMorph('mouthSmileLeft', 0.15);
+  setMorph('mouthSmileRight', 0.15);
+
+  // Napas halus - mouthShrugUpper naik turun pelan
+  let breathVal = 0;
+  let breathDir = 1;
+  idleHeadInterval = setInterval(() => {
+    breathVal += 0.02 * breathDir;
+    if (breathVal > 0.12 || breathVal < 0) breathDir *= -1;
+    setMorph('mouthShrugUpper', breathVal);
+    setMorph('noseSneeze', breathVal * 0.3);
+  }, 80);
+}
+
+function stopIdleAnimations() {
+  clearTimeout(blinkInterval);
+  clearInterval(idleHeadInterval);
+  idleTimers.forEach(t => clearTimeout(t));
+  idleTimers = [];
+}
+
+// ============================================================
+// EMOTION SYSTEM
+// Catatan: emosi sekarang diterapkan PER KALIMAT selama avatar bicara
+// (lihat scheduleEmotionShifts), bukan cuma sekali di awal/akhir.
+// Ini membuat ekspresi terasa lebih hidup mengikuti isi tiap kalimat.
+// ============================================================
+function detectEmotion(text) {
+  const t = text.toLowerCase();
+  if (/terima kasih|makasih|thank|senang|bagus|baik|selesai|berhasil|oke|mantap/.test(t)) return 'happy';
+  if (/maaf|error|gagal|tidak bisa|mohon maaf|sorry/.test(t)) return 'apologetic';
+  if (/halo|hai|selamat|welcome|hei/.test(t)) return 'greeting';
+  if (/[?]|apa|bagaimana|kenapa|mengapa|kapan|dimana|siapa/.test(t)) return 'curious';
+  return 'neutral';
+}
+
+function applyEmotion(emotion) {
+  // Reset ekspresi dulu (smooth, supaya tidak "patah" antar kalimat)
+  ['mouthSmileLeft','mouthSmileRight','mouthFrownLeft','mouthFrownRight',
+   'browInnerUp','browOuterUpLeft','browOuterUpRight','browDownLeft','browDownRight',
+   'cheekPuff','cheekSquintLeft','cheekSquintRight',
+   'eyeSquintLeft','eyeSquintRight','eyeWideLeft','eyeWideRight'
+  ].forEach(t => animateMorphTo(t, 0, 220));
+
+  switch(emotion) {
+    case 'happy':
+      animateMorphTo('mouthSmileLeft', 0.7, 220);
+      animateMorphTo('mouthSmileRight', 0.7, 220);
+      animateMorphTo('cheekSquintLeft', 0.4, 220);
+      animateMorphTo('cheekSquintRight', 0.4, 220);
+      animateMorphTo('eyeSquintLeft', 0.3, 220);
+      animateMorphTo('eyeSquintRight', 0.3, 220);
+      animateMorphTo('browOuterUpLeft', 0.2, 220);
+      animateMorphTo('browOuterUpRight', 0.2, 220);
+      break;
+    case 'greeting':
+      animateMorphTo('mouthSmileLeft', 0.5, 220);
+      animateMorphTo('mouthSmileRight', 0.5, 220);
+      animateMorphTo('browInnerUp', 0.4, 220);
+      animateMorphTo('browOuterUpLeft', 0.4, 220);
+      animateMorphTo('browOuterUpRight', 0.4, 220);
+      animateMorphTo('eyeWideLeft', 0.2, 220);
+      animateMorphTo('eyeWideRight', 0.2, 220);
+      break;
+    case 'apologetic':
+      animateMorphTo('mouthFrownLeft', 0.3, 220);
+      animateMorphTo('mouthFrownRight', 0.3, 220);
+      animateMorphTo('browInnerUp', 0.6, 220);
+      animateMorphTo('browDownLeft', 0.2, 220);
+      animateMorphTo('browDownRight', 0.2, 220);
+      break;
+    case 'curious':
+      animateMorphTo('browInnerUp', 0.3, 220);
+      animateMorphTo('browOuterUpLeft', 0.5, 220);
+      animateMorphTo('browOuterUpRight', 0.1, 220);
+      animateMorphTo('eyeWideLeft', 0.3, 220);
+      animateMorphTo('mouthSmileLeft', 0.2, 220);
+      animateMorphTo('mouthSmileRight', 0.2, 220);
+      break;
+    case 'neutral':
+    default:
+      animateMorphTo('mouthSmileLeft', 0.12, 220);
+      animateMorphTo('mouthSmileRight', 0.12, 220);
+      break;
+  }
+}
+
+// Pecah teks jadi kalimat, dan untuk tiap kalimat tentukan kapan (ms dari awal
+// bicara) emosinya harus diterapkan, berdasarkan wtimes kata pertama kalimat itu.
+function scheduleEmotionShifts(fullText, words, wtimes) {
+  const sentences = fullText.split(/(?<=[.!?])\s+/).filter(s => s.trim());
+  if (sentences.length === 0 || words.length === 0) return [];
+
+  const timers = [];
+  let wordCursor = 0;
+
+  for (const sentence of sentences) {
+    const sentenceWordCount = sentence.trim().split(/\s+/).length;
+    const startWordIdx = Math.min(wordCursor, words.length - 1);
+    const startTime = wtimes[startWordIdx] || 0;
+    const emotion = detectEmotion(sentence);
+
+    timers.push(setTimeout(() => applyEmotion(emotion), startTime));
+    wordCursor += sentenceWordCount;
+  }
+  return timers;
+}
+
+// ============================================================
+// EMOJI -> EKSPRESI WAJAH
+// Backend (tts.py) sudah menghapus karakter emoji dari teks yang dikirim ke
+// edge-tts (supaya tidak dibacakan literal, mis. "emoji senyum"), dan
+// mengirim balik daftar emoji + posisi relatifnya dalam teks asli (0.0-1.0).
+// Di sini posisi itu dikonversi jadi waktu absolut (ms dari awal audio) untuk
+// memicu ekspresi wajah pada saat yang tepat, alih-alih emoji diucapkan.
+// ============================================================
+const EMOJI_TO_EMOTION = {
+  '😊': 'happy', '😀': 'happy', '😃': 'happy', '😄': 'happy', '🙂': 'happy',
+  '😁': 'happy', '🎉': 'happy', '👍': 'happy', '✅': 'happy', '💪': 'happy',
+  '🙏': 'happy', '👋': 'greeting', '😔': 'apologetic', '😢': 'apologetic',
+  '😞': 'apologetic', '😟': 'apologetic', '🤔': 'curious', '❓': 'curious',
+  '😯': 'curious', '👀': 'curious',
+};
+
+function scheduleEmojiExpressions(emojis, totalDurationMs) {
+  if (!emojis || emojis.length === 0) return [];
+  const timers = [];
+  for (const item of emojis) {
+    const emotion = EMOJI_TO_EMOTION[item.emoji];
+    if (!emotion) continue;
+    const triggerTime = Math.max(0, Math.min(totalDurationMs - 50, item.position * totalDurationMs));
+    timers.push(setTimeout(() => applyEmotion(emotion), triggerTime));
+  }
+  return timers;
+}
+
+// ============================================================
+// SPEAK AUDIO - MAIN FUNCTION
+// Menggunakan head.speakAudio() bawaan TalkingHead dengan audio + word timing
+// presisi dari backend (edge-tts), bukan lagi text-timing approximation.
+// Ini menghilangkan konflik antara jaw-interval manual dan viseme onboundary
+// yang sebelumnya saling menimpa morph target yang sama.
+// ============================================================
+let emotionTimers = [];
+
+function clearEmotionTimers() {
+  emotionTimers.forEach(t => clearTimeout(t));
+  emotionTimers = [];
+}
+
+function base64ToArrayBuffer(base64) {
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+async function speakAudioFromBackend(text, audioBase64, words, wtimes, wdurations, visemes, vtimes, vdurations, emojis) {
+  if (!document.getElementById('auto-speak').checked || !head) return;
+  if (!audioBase64) {
+    // Fallback: backend gagal generate audio (mis. internet putus).
+    // Tetap tampilkan ekspresi dasar tanpa suara, jangan diamkan avatar total.
+    console.warn('[Speak] Tidak ada audio dari backend, skip TTS.');
+    return;
+  }
+
+  if (morphMeshes.length === 0) cacheMorphMeshes();
+  clearEmotionTimers();
+  stopIdleAnimations();
+  resetMouth();
+
+  try {
+    if (head.audioCtx && head.audioCtx.state === 'suspended') {
+      await head.audioCtx.resume();
+    }
+
+    const arrayBuffer = base64ToArrayBuffer(audioBase64);
+    const audioBuffer = await head.audioCtx.decodeAudioData(arrayBuffer.slice(0));
+    const totalDurationMs = audioBuffer.duration * 1000;
+
+    setStatus('talking');
+    applyEmotion(detectEmotion(text));
+    emotionTimers = scheduleEmotionShifts(text, words, wtimes);
+    // Emoji yang sudah dihapus dari teks oleh backend (lihat tts.py) dipicu
+    // sebagai ekspresi wajah pada momen yang tepat, alih-alih diucapkan TTS.
+    emotionTimers = emotionTimers.concat(scheduleEmojiExpressions(emojis, totalDurationMs));
+
+    const speakPayload = { audio: audioBuffer, words: words, wtimes: wtimes, wdurations: wdurations };
+    // visemes/vtimes/vdurations (Oculus viseme ID per fonem dari grapheme-to-viseme
+    // Bahasa Indonesia di backend) memberi gerakan mulut jauh lebih presisi
+    // dibanding hanya words/wtimes saja, yang membuat TalkingHead cuma menggerakkan
+    // mulut generik berdasarkan durasi kata (buka-tutup tanpa bentuk per-fonem).
+    if (visemes && visemes.length > 0) {
+      speakPayload.visemes = visemes;
+      speakPayload.vtimes = vtimes;
+      speakPayload.vdurations = vdurations;
+    }
+
+    head.speakAudio(
+      speakPayload,
+      {},
+      () => {
+        // onsubtitles callback - tidak dipakai, subtitle ditangani lewat chat bubble
+      }
+    );
+
+    // TalkingHead tidak punya event "onend" langsung di speakAudio, jadi kita
+    // selesaikan status berdasarkan durasi total audio.
+    setTimeout(() => {
+      clearEmotionTimers();
+      setStatus('');
+      applyEmotion(detectEmotion(text) === 'happy' ? 'happy' : 'neutral');
+      setTimeout(startIdleAnimations, 400);
+    }, totalDurationMs + 150);
+
+  } catch (err) {
+    console.error('[Speak] Gagal memutar audio:', err);
+    setStatus('');
+    setTimeout(startIdleAnimations, 400);
+  }
+}
+
+async function playGreeting() {
+  try {
+    const res = await fetch(`${API_URL}/greeting`);
+    if (!res.ok) throw new Error('Server error ' + res.status);
+    const data = await res.json();
+    appendMsg('bot', data.reply);
+    await speakAudioFromBackend(data.reply, data.audio_base64, data.words, data.wtimes, data.wdurations, data.visemes, data.vtimes, data.vdurations, data.emojis);
+  } catch (e) {
+    console.warn('[Greeting] Gagal memuat sapaan dari server.', e);
+  }
+}
+
+function renderMarkdown(text) {
+  let html = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong style="color:#e2d9f3">$1</strong>');
+  html = html.replace(/\b([A-Z]+-\d{4})\b/g, '<code style="background:rgba(167,139,250,0.15);padding:1px 6px;border-radius:4px;color:#c4b5fd;font-size:12px">$1</code>');
+  const lines = html.split('\n');
+  let result = [];
+  for (let line of lines) {
+    line = line.trim();
+    if (!line) { result.push('<div style="height:6px"></div>'); continue; }
+    if (/^[-•]\s+/.test(line)) {
+      result.push('<div style="display:flex;gap:6px;margin:3px 0"><span style="color:#a78bfa;flex-shrink:0">•</span><span>' + line.replace(/^[-•]\s+/,'') + '</span></div>');
+    } else {
+      result.push('<div style="margin:2px 0">' + line + '</div>');
+    }
+  }
+  return result.join('');
+}
+
+function appendMsg(role, text, file, imageBase64, imageMimeType) {
+  const msgDiv = document.createElement('div');
+  msgDiv.className = 'msg ' + role;
+  const avatarDiv = document.createElement('div');
+  avatarDiv.className = 'msg-avatar';
+  if (role === 'user') {
+    avatarDiv.textContent = 'U';
+    avatarDiv.style.cssText = 'background:#312060;color:#c4b5fd;font-weight:700;font-size:12px;';
+  } else {
+    avatarDiv.textContent = '🤖';
+  }
+  const bodyDiv = document.createElement('div');
+
+  // Preview gambar yang diupload user, ditampilkan di atas bubble teks.
+  // Sebelumnya file yang diupload (mis. foto struk) sama sekali tidak muncul
+  // di riwayat chat — user cuma lihat balasan bot tanpa konteks visual apa
+  // yang sebenarnya dikirim, terasa seperti gambar "tidak terkirim".
+  if (file && file.type && file.type.startsWith('image/')) {
+    const imgWrap = document.createElement('div');
+    imgWrap.className = 'msg-image-wrap';
+    const img = document.createElement('img');
+    img.className = 'msg-image';
+    img.src = URL.createObjectURL(file);
+    img.alt = file.name || 'gambar';
+    imgWrap.appendChild(img);
+    bodyDiv.appendChild(imgWrap);
+  } else if (file) {
+    // File non-gambar (pdf, xlsx, dst) ditampilkan sebagai chip nama file.
+    const fileChip = document.createElement('div');
+    fileChip.className = 'msg-file-chip';
+    fileChip.textContent = '📎 ' + file.name;
+    bodyDiv.appendChild(fileChip);
+  }
+
+  // Gambar dari BALASAN BOT (mis. foto bukti struk reimburse yang diminta
+  // user lihat ulang). Dikirim server sebagai base64 langsung di response
+  // /chat — BUKAN link/URL yang harus di-fetch terpisah, supaya tidak ada
+  // celah bagi LLM mengarang path/domain link yang sebelumnya jadi masalah
+  // berulang (mis. "link-download.com" yang sama sekali bukan domain valid).
+  if (imageBase64) {
+    const imgWrap = document.createElement('div');
+    imgWrap.className = 'msg-image-wrap';
+    const img = document.createElement('img');
+    img.className = 'msg-image';
+    img.src = `data:${imageMimeType || 'image/jpeg'};base64,${imageBase64}`;
+    img.alt = 'bukti';
+    imgWrap.appendChild(img);
+    bodyDiv.appendChild(imgWrap);
+  }
+
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+  if (role === 'bot') bubble.innerHTML = renderMarkdown(text);
+  else bubble.textContent = text;
+  const time = document.createElement('div');
+  time.className = 'msg-time';
+  time.textContent = getTime();
+  bodyDiv.appendChild(bubble);
+  bodyDiv.appendChild(time);
+  msgDiv.appendChild(avatarDiv);
+  msgDiv.appendChild(bodyDiv);
+  messagesEl.appendChild(msgDiv);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+async function sendMessage() {
+  const text = chatInput.value.trim();
+  if (!text && !selectedFile || isProcessing) return;
+  const msgText = text || 'Tolong analisa file ini.';
+  chatInput.value = '';
+  autoResize(chatInput);
+  isProcessing = true;
+  sendBtn.disabled = true;
+  errorEl.classList.remove('visible');
+
+  const fileToSend = selectedFile;
+  appendMsg('user', msgText, fileToSend);
+  clearFile();
+  typingEl.classList.add('visible');
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  setStatus('thinking');
+
+  if (head) {
+    try { head.speakEmoji('🤔'); } catch(e) {}
+  }
+
+  try {
+    let data;
+    if (fileToSend) {
+      const formData = new FormData();
+      formData.append('session_id', SESSION_ID);
+      formData.append('message', msgText);
+      formData.append('file', fileToSend);
+      const res = await fetch(`${API_URL}/chat-with-file`, { method: 'POST', body: formData });
+      if (!res.ok) throw new Error('Server error ' + res.status);
+      data = await res.json();
+    } else {
+      const res = await fetch(`${API_URL}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: SESSION_ID,
+          message: msgText,
+          voice: voiceSelect.value,
+          rate: parseFloat(document.getElementById('rate-slider').value)
+        })
+      });
+      if (!res.ok) throw new Error('Server error ' + res.status);
+      data = await res.json();
+    }
+
+    const reply = data.reply || data.response || data.message || JSON.stringify(data);
+    typingEl.classList.remove('visible');
+    appendMsg('bot', reply, null, data.image_base64, data.image_mime_type);
+
+    if (data.skill_used) {
+      const tag = document.createElement('div');
+      tag.className = 'skill-tag';
+      tag.textContent = 'via ' + data.skill_used;
+      messagesEl.appendChild(tag);
+    }
+
+    // Link download nyata (bukan klaim teks dari LLM) ke file yang benar-benar
+    // dibuat di server, lewat endpoint /storage/download-export/{file}.
+    if (data.download_url) {
+      const link = document.createElement('a');
+      link.href = API_URL + data.download_url;
+      link.download = data.download_filename || '';
+      link.className = 'download-link';
+      link.textContent = '📄 Unduh ' + (data.download_filename || 'file');
+      link.target = '_blank';
+      messagesEl.appendChild(link);
+    }
+
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    const plainText = reply.replace(/\*\*/g,'').replace(/[-•]\s/g,'').replace(/\n+/g,' ');
+    await speakAudioFromBackend(plainText, data.audio_base64, data.words, data.wtimes, data.wdurations, data.visemes, data.vtimes, data.vdurations, data.emojis);
+
+  } catch (err) {
+    typingEl.classList.remove('visible');
+    setStatus('');
+    errorEl.classList.add('visible');
+    appendMsg('bot', 'Maaf, koneksi ke server terputus. Pastikan server jalan di localhost:8080');
+    console.error(err);
+  }
+
+  isProcessing = false;
+  sendBtn.disabled = false;
+  chatInput.focus();
+}
+
+window.sendMessage = sendMessage;
+window.sendQuick = (text) => { chatInput.value = text; sendMessage(); };
+window.switchModel = switchModel;
+
+window.handleKey = (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+};
+
+window.autoResize = (el) => {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+};
+
+function getFileIcon(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  const map = {pdf:'📄',xlsx:'📊',xls:'📊',docx:'📝',doc:'📝',txt:'📃',csv:'📊',png:'🖼',jpg:'🖼',jpeg:'🖼',webp:'🖼'};
+  return map[ext] || '📎';
+}
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + 'B';
+  if (bytes < 1024*1024) return Math.round(bytes/1024) + 'KB';
+  return (bytes/(1024*1024)).toFixed(1) + 'MB';
+}
+function clearFile() {
+  selectedFile = null;
+  const preview = document.getElementById('file-preview');
+  preview.innerHTML = '';
+  preview.classList.remove('visible');
+}
+
+window.handleFileSelect = (input) => {
+  const file = input.files[0];
+  if (!file) return;
+  selectedFile = file;
+  const preview = document.getElementById('file-preview');
+  preview.innerHTML = '';
+  preview.classList.add('visible');
+  const chip = document.createElement('div');
+  chip.className = 'file-chip';
+  if (file.type.startsWith('image/')) {
+    const img = document.createElement('img');
+    img.className = 'file-img-preview';
+    img.src = URL.createObjectURL(file);
+    chip.appendChild(img);
+  } else {
+    const icon = document.createElement('span');
+    icon.textContent = getFileIcon(file.name);
+    icon.style.fontSize = '18px';
+    chip.appendChild(icon);
+  }
+  const name = document.createElement('span');
+  name.textContent = file.name;
+  chip.appendChild(name);
+  const size = document.createElement('span');
+  size.style.cssText = 'color:#6b50a8;font-size:10px;flex-shrink:0';
+  size.textContent = formatSize(file.size);
+  chip.appendChild(size);
+  const rm = document.createElement('button');
+  rm.className = 'file-chip-remove';
+  rm.textContent = '×';
+  rm.onclick = clearFile;
+  chip.appendChild(rm);
+  preview.appendChild(chip);
+  input.value = '';
+};
+
+async function checkServer() {
+  try {
+    const res = await fetch(`${API_URL}/skills`, { signal: AbortSignal.timeout(4000) });
+    if (res.ok) {
+      const data = await res.json();
+      const count = data.skills ? data.skills.length : 0;
+      modelInfo.textContent = count + ' skill aktif';
+      modelInfo.style.color = '#34d399';
+    } else throw new Error();
+  } catch {
+    modelInfo.textContent = 'Server tidak terdeteksi';
+    modelInfo.style.color = '#f87171';
+  }
+}
+
+checkServer();
+showStartScreen(); // Tampilkan tombol dulu, jangan auto-init
+</script>
+</body>
+</html>
