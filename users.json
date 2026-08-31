@@ -1,9 +1,0 @@
-{
-  "users": [
-    {
-      "username": "al",
-      "password_hash": "$2b$12$/RIjdOCiXWYnQUdSTUKuB.W8fvgJLDi0A36QeVZBqY1wDm.PO3p/m",
-      "role": "admin"
-    }
-  ]
-}

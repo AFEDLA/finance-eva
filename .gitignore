@@ -32,3 +32,5 @@ web/avatars/*.glb
 Thumbs.db
 .vscode/
 .idea/
+
+users.json
