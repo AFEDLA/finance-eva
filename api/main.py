@@ -11,6 +11,8 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import sys, os, json, base64, mimetypes
 from pathlib import Path
+from api.auth import router as auth_router
+from api.middleware import AuthMiddleware
 
 _API_DIR               = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT_FOR_IMPORT = os.path.dirname(_API_DIR)
@@ -40,6 +42,8 @@ PROJECT_ROOT = os.path.dirname(BASE_DIR)
 WEB_DIR      = os.path.join(PROJECT_ROOT, "web")
 
 app   = FastAPI(title=f"{AGENT_NAME} — {AGENT_TAGLINE}")
+app.add_middleware(AuthMiddleware)
+app.include_router(auth_router)
 agent = Agent()
 
 # Migrate data lama — hitung ulang field total PR yang belum ada
@@ -115,6 +119,10 @@ async def _attach_tts(response: dict, text: str, voice_enabled: bool,
         })
     return response
 
+
+@app.get("/login")
+def login_page():
+    return FileResponse(os.path.join(WEB_DIR, "login.html"))
 
 @app.get("/")
 def root():

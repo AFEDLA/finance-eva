@@ -111,7 +111,7 @@ html, body {
 .nav-divider { border: none; border-top: 1px solid #f3f4f6; margin: 6px 12px; }
 
 .agent-status {
-  margin: auto 10px 12px;
+  margin: auto 10px 0;
   padding: 10px 12px; border-radius: 10px;
   border: 1px solid #e5e7eb; background: #fafafa;
   display: flex; align-items: center; gap: 9px; flex-shrink: 0;
@@ -120,6 +120,49 @@ html, body {
 .status-dot.talking { background: #16a34a; }
 .status-dot.thinking { background: #f59e0b; }
 .status-text-name { font-size: 12px; font-weight: 600; color: #111; }
+
+/* ── Profile Icon (nav bawah) ── */
+.nav-profile {
+  padding: 10px 12px 14px;
+  border-top: 1px solid rgba(0,0,0,0.07);
+  background: #ffffff;
+  flex-shrink: 0;
+}
+.profile-btn {
+  width: 100%; display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: 10px;
+  background: rgba(0,0,0,0.04); border: 1px solid rgba(0,0,0,0.08);
+  cursor: pointer; transition: background 0.2s; position: relative;
+}
+.profile-btn:hover { background: rgba(0,0,0,0.08); }
+.profile-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: linear-gradient(135deg, #16a34a, #22c55e);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0;
+}
+.profile-info { flex: 1; text-align: left; overflow: hidden; }
+.profile-name {
+  font-size: 12.5px; font-weight: 600; color: #1f2937;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.profile-role { font-size: 10.5px; color: #6b7280; text-transform: capitalize; }
+.profile-dropdown {
+  display: none; position: fixed;
+  bottom: 80px; left: 12px; width: 180px;
+  background: #ffffff; border: 1px solid rgba(0,0,0,0.10);
+  border-radius: 10px; overflow: hidden;
+  box-shadow: 0 -8px 28px rgba(0,0,0,0.12); z-index: 200;
+}
+.profile-dropdown.open { display: block; }
+.dropdown-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 11px 14px; font-size: 13px; color: #374151;
+  cursor: pointer; transition: background 0.15s, color 0.15s;
+}
+.dropdown-item:hover { background: #f3f4f6; color: #111827; }
+.dropdown-item.danger:hover { background: #fef2f2; color: #dc2626; }
+.dropdown-item svg { width: 15px; height: 15px; flex-shrink: 0; fill: currentColor; }
 .status-text-sub { font-size: 11px; color: #888; margin-top: 1px; }
 
 /* ============================================================
@@ -1219,11 +1262,33 @@ html, body {
       </div>
     </div>
 
+    <div style="flex:1;"></div>
+
     <div class="agent-status">
       <div class="status-dot" id="nav-status-dot"></div>
       <div>
         <div class="status-text-name">Eva</div>
         <div class="status-text-sub" id="nav-status-sub">Online · Siap membantu</div>
+      </div>
+    </div>
+
+    <!-- Profile Icon -->
+    <div class="nav-profile">
+      <div class="profile-dropdown" id="profileDropdown">
+        <div class="dropdown-item danger" onclick="window.doLogout()">
+          <svg viewBox="0 0 24 24"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+          Logout
+        </div>
+      </div>
+      <div class="profile-btn" id="profileBtn" onclick="window.toggleProfileDropdown(event)">
+        <div class="profile-avatar" id="profileAvatar">A</div>
+        <div class="profile-info">
+          <div class="profile-name" id="profileName">User</div>
+          <div class="profile-role" id="profileRole">user</div>
+        </div>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="rgba(0,0,0,0.3)">
+          <path d="M7 14l5-5 5 5z"/>
+        </svg>
       </div>
     </div>
   </div>
@@ -1488,6 +1553,47 @@ import { TalkingHead } from "talkinghead";
 const API_URL = window.location.origin;
 const SESSION_ID = 'holomoc-admin-' + Math.random().toString(36).substr(2, 9);
 
+// ── AUTH GUARD ──────────────────────────────────────────
+const OLA_TOKEN    = localStorage.getItem('eva_token');
+const OLA_USERNAME = localStorage.getItem('eva_username') || 'User';
+const OLA_ROLE     = localStorage.getItem('eva_role') || 'user';
+
+if (!OLA_TOKEN) { window.location.href = '/login'; }
+
+function authHeaders(extra = {}) {
+  return { 'Authorization': `Bearer ${OLA_TOKEN}`, ...extra };
+}
+async function apiFetch(url, options = {}) {
+  const res = await fetch(url, {
+    ...options,
+    headers: authHeaders(options.headers || {})
+  });
+  if (res.status === 401) { window.doLogout(); return null; }
+  return res;
+}
+window.apiFetch = apiFetch;
+window.toggleProfileDropdown = function(event) {
+  if (event) event.stopPropagation();
+  document.getElementById('profileDropdown').classList.toggle('open');
+};
+document.addEventListener('click', e => {
+  const btn = document.getElementById('profileBtn');
+  const dd  = document.getElementById('profileDropdown');
+  if (btn && dd && !btn.contains(e.target) && !dd.contains(e.target)) {
+    dd.classList.remove('open');
+  }
+});
+window.doLogout = function() {
+  localStorage.removeItem('eva_token');
+  localStorage.removeItem('eva_username');
+  localStorage.removeItem('eva_role');
+  window.location.href = '/login';
+};
+document.getElementById('profileName').textContent   = OLA_USERNAME;
+document.getElementById('profileRole').textContent   = OLA_ROLE;
+document.getElementById('profileAvatar').textContent = OLA_USERNAME.charAt(0).toUpperCase();
+// ────────────────────────────────────────────────────────
+
 let head = null;
 let isProcessing = false;
 let selectedFile = null;
@@ -1664,7 +1770,7 @@ async function loadOverlayData(mode) {
   body.innerHTML = '<div class="co-loading"><div class="co-spin"></div> Memuat data...</div>';
 
   try {
-    const res = await fetch(API_URL + cfg.endpoint, { signal: AbortSignal.timeout(8000) });
+    const res = await apiFetch(API_URL + cfg.endpoint, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) throw new Error('Server error ' + res.status);
     const json = await res.json();
     // Handle berbagai format response: {data:[]}, {budgets:[]}, atau array langsung
@@ -1674,7 +1780,7 @@ async function loadOverlayData(mode) {
     let renderData = (cfg.type === 'budget') ? json : overlayState.allData;
     if (cfg.type === 'budget' && window._budgetShowClosed) {
       try {
-        const resClosed = await fetch(API_URL + '/api/budgets?status=closed', { signal: AbortSignal.timeout(4000) });
+        const resClosed = await apiFetch(API_URL + '/api/budgets?status=closed', { signal: AbortSignal.timeout(4000) });
         if (resClosed.ok) {
           const closedJson = await resClosed.json();
           renderData = { ...json, budgets_closed: closedJson.budgets || [] };
@@ -1739,7 +1845,7 @@ async function silentRefreshOverlay(mode) {
   const cfg = OVERLAY_CONFIG[mode];
   if (!cfg) return;
   try {
-    const res = await fetch(API_URL + cfg.endpoint, { signal: AbortSignal.timeout(8000) });
+    const res = await apiFetch(API_URL + cfg.endpoint, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) return;
     const json = await res.json();
     // Handle berbagai format response: {data:[]}, {budgets:[]}, atau array langsung
@@ -2255,7 +2361,7 @@ window.financeApproveReject = async function(finId, newStatus) {
   const label = newStatus === 'approved' ? 'approve' : 'reject';
   // Ubah tampilan tombol jadi loading
   try {
-    const res = await fetch(`${API_URL}/storage/finance/${finId}/status`, {
+    const res = await apiFetch(`${API_URL}/storage/finance/${finId}/status`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus })
@@ -2288,7 +2394,7 @@ window.financeAskEva = function(finId, nama, jenis) {
 window.financeDeleteDirect = async function(finId) {
   if (!confirm(`Hapus ${finId}? Tidak bisa dibatalkan.`)) return;
   try {
-    const res = await fetch(`${API_URL}/storage/finance/${finId}`, { method: 'DELETE' });
+    const res = await apiFetch(`${API_URL}/storage/finance/${finId}`, { method: 'DELETE' });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || 'HTTP ' + res.status);
@@ -2305,7 +2411,7 @@ window.financeDeleteDirect = async function(finId) {
 window.financeEditDetailModal = async function(finId) {
   let fin = null;
   try {
-    const res  = await fetch(`${API_URL}/storage/list/finance`);
+    const res  = await apiFetch(`${API_URL}/storage/list/finance`);
     const json = await res.json();
     fin = (json.data || []).find(x => x.id === finId);
   } catch(e) {}
@@ -2384,7 +2490,7 @@ window.finSaveDetail = async function(finId) {
     if (el) updates[f] = el.value.trim();
   });
   try {
-    const res = await fetch(`${API_URL}/storage/finance/${finId}/detail`, {
+    const res = await apiFetch(`${API_URL}/storage/finance/${finId}/detail`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates)
@@ -2434,7 +2540,7 @@ window.financeExportDirect = async function(fmt) {
   const url = `${API_URL}/storage/export/${fmt}${params.toString() ? '?' + params.toString() : ''}`;
   try {
     appendMsg('bot', `⏳ Membuat laporan keuangan ${fmt.toUpperCase()} ${labelBulan} ${labelTahun}...`, null);
-    const res = await fetch(url);
+    const res = await apiFetch(url);
     if (!res.ok) {
       const txt = await res.text();
       throw new Error('HTTP ' + res.status + ': ' + txt);
@@ -2762,7 +2868,7 @@ window.poEditItemsModal = async function(poId) {
   // Fetch data PO dulu
   let po = null;
   try {
-    const res = await fetch(`/storage/list/po`);
+    const res = await apiFetch(`/storage/list/po`);
     const json = await res.json();
     const all = json.data || json;
     po = all.find(p => p.id === poId);
@@ -2954,7 +3060,7 @@ window.poSaveItemEdits = async function(poId, origCount) {
   // Kirim via API dedicated untuk update items PO
   document.getElementById('po-edit-modal')?.remove();
   try {
-    const res = await fetch(`/storage/po/${poId}/items`, {
+    const res = await apiFetch(`/storage/po/${poId}/items`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items: newItems })
@@ -2973,7 +3079,7 @@ window.poSaveItemEdits = async function(poId, origCount) {
 window.poEditDetailModal = async function(poId) {
   let po = null;
   try {
-    const res = await fetch(`/storage/list/po`);
+    const res = await apiFetch(`/storage/list/po`);
     const json = await res.json();
     const all = json.data || json;
     po = all.find(p => p.id === poId);
@@ -3062,7 +3168,7 @@ window.poSaveDetailEdits = async function(poId) {
   });
 
   try {
-    const res = await fetch(`/storage/po/${poId}/detail`, {
+    const res = await apiFetch(`/storage/po/${poId}/detail`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates)
@@ -3085,7 +3191,7 @@ window.poSaveDetailEdits = async function(poId) {
 window.prEditDetailModal = async function(prId) {
   let pr = null;
   try {
-    const res  = await fetch(`/storage/list/pr`);
+    const res  = await apiFetch(`/storage/list/pr`);
     const json = await res.json();
     const all  = json.data || json;
     pr = all.find(p => p.id === prId);
@@ -3160,7 +3266,7 @@ window.prSaveDetailEdits = async function(prId) {
     if (el) updates[f] = el.value.trim();
   });
   try {
-    const res = await fetch(`/storage/pr/${prId}/detail`, {
+    const res = await apiFetch(`/storage/pr/${prId}/detail`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates)
@@ -3181,7 +3287,7 @@ window.prSaveDetailEdits = async function(prId) {
 window.prEditItemsModal = async function(prId) {
   let pr = null;
   try {
-    const res  = await fetch(`/storage/list/pr`);
+    const res  = await apiFetch(`/storage/list/pr`);
     const json = await res.json();
     const all  = json.data || json;
     pr = all.find(p => p.id === prId);
@@ -3336,7 +3442,7 @@ window.prSaveItemEdits = async function(prId, origCount) {
   if (!newItems.length) { alert('Minimal satu item harus ada di PR.'); return; }
   document.getElementById('pr-edit-items-modal')?.remove();
   try {
-    const res = await fetch(`/storage/pr/${prId}/items`, {
+    const res = await apiFetch(`/storage/pr/${prId}/items`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items: newItems })
@@ -3357,7 +3463,7 @@ window.prSaveItemEdits = async function(prId, origCount) {
 window.qtEditDetailModal = async function(qtId) {
   let qt = null;
   try {
-    const res  = await fetch(`/storage/list/qt`);
+    const res  = await apiFetch(`/storage/list/qt`);
     const json = await res.json();
     const all  = json.data || json;
     qt = all.find(q => q.id === qtId);
@@ -3435,7 +3541,7 @@ window.qtSaveDetailEdits = async function(qtId) {
     if (el) updates[f] = el.value.trim();
   });
   try {
-    const res = await fetch(`/storage/qt/${qtId}/detail`, {
+    const res = await apiFetch(`/storage/qt/${qtId}/detail`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates)
@@ -3456,7 +3562,7 @@ window.qtSaveDetailEdits = async function(qtId) {
 window.qtEditItemsModal = async function(qtId) {
   let qt = null;
   try {
-    const res  = await fetch(`/storage/list/qt`);
+    const res  = await apiFetch(`/storage/list/qt`);
     const json = await res.json();
     const all  = json.data || json;
     qt = all.find(q => q.id === qtId);
@@ -3611,7 +3717,7 @@ window.qtSaveItemEdits = async function(qtId, origCount) {
   if (!newItems.length) { alert('Minimal satu item harus ada di Quotation.'); return; }
   document.getElementById('qt-edit-items-modal')?.remove();
   try {
-    const res = await fetch(`/storage/qt/${qtId}/items`, {
+    const res = await apiFetch(`/storage/qt/${qtId}/items`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items: newItems })
@@ -3633,7 +3739,7 @@ window.qtSaveItemEdits = async function(qtId, origCount) {
 window.invEditDetailModal = async function(invId) {
   let inv = null;
   try {
-    const res  = await fetch(`/storage/inv/${invId}`);
+    const res  = await apiFetch(`/storage/inv/${invId}`);
     const json = await res.json();
     inv = json.data || null;
   } catch(e) {}
@@ -3713,7 +3819,7 @@ window.invSaveDetailEdits = async function(invId) {
     if (el) updates[f] = el.value.trim();
   });
   try {
-    const res = await fetch(`/storage/inv/${invId}/detail`, {
+    const res = await apiFetch(`/storage/inv/${invId}/detail`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates)
@@ -3734,7 +3840,7 @@ window.invSaveDetailEdits = async function(invId) {
 window.invEditItemsModal = async function(invId) {
   let inv = null;
   try {
-    const res  = await fetch(`/storage/inv/${invId}`);
+    const res  = await apiFetch(`/storage/inv/${invId}`);
     const json = await res.json();
     inv = json.data || null;
   } catch(e) {}
@@ -3902,7 +4008,7 @@ window.invSaveItemEdits = async function(invId, origCount) {
   if (!newItems.length) { alert('Minimal satu item harus ada di Invoice.'); return; }
   document.getElementById('inv-edit-items-modal')?.remove();
   try {
-    const res = await fetch(`/storage/inv/${invId}/items`, {
+    const res = await apiFetch(`/storage/inv/${invId}/items`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items: newItems })
@@ -3919,7 +4025,7 @@ window.invSaveItemEdits = async function(invId, origCount) {
 // ── INV: Update status via API (Issue / Mark Paid) ────────────────────────────
 window.invUpdateStatus = async function(invId, newStatus) {
   try {
-    const res = await fetch(`/storage/inv/${invId}/status`, {
+    const res = await apiFetch(`/storage/inv/${invId}/status`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus }),
@@ -3935,7 +4041,7 @@ window.invUpdateStatus = async function(invId, newStatus) {
 // ── INV: Delete ───────────────────────────────────────────────────────────────
 window.invDelete = async function(invId) {
   try {
-    const res = await fetch(`/storage/inv/${invId}`, { method: 'DELETE' });
+    const res = await apiFetch(`/storage/inv/${invId}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     await loadOverlay('inv');
     appendMsg('bot', `✅ ${invId} berhasil dihapus`);
@@ -4267,14 +4373,14 @@ async function refreshBudgetOverlay() {
     const showClosed = window._budgetShowClosed || false;
 
     // Selalu fetch active
-    const resActive = await fetch(API_URL + '/api/budgets?status=active', { signal: AbortSignal.timeout(5000) });
+    const resActive = await apiFetch(API_URL + '/api/budgets?status=active', { signal: AbortSignal.timeout(5000) });
     const activeData = resActive.ok ? await resActive.json() : { budgets: [] };
 
     // Fetch closed hanya jika belum di-cache atau toggle baru aktif
     let closedBudgets = window._cachedClosedBudgets || [];
     if (showClosed && closedBudgets.length === 0) {
       try {
-        const resClosed = await fetch(API_URL + '/api/budgets?status=closed', { signal: AbortSignal.timeout(5000) });
+        const resClosed = await apiFetch(API_URL + '/api/budgets?status=closed', { signal: AbortSignal.timeout(5000) });
         if (resClosed.ok) {
           const closedData = await resClosed.json();
           closedBudgets = closedData.budgets || [];
@@ -4313,7 +4419,7 @@ window.toggleClosedBudgets = async function(checked) {
   if (!window._cachedClosedBudgets || window._cachedClosedBudgets.length === 0) {
     try {
       const baseUrl = (typeof API_URL !== 'undefined' ? API_URL : window.location.origin);
-      const r = await fetch(baseUrl + '/api/budgets?status=closed', { signal: AbortSignal.timeout(5000) });
+      const r = await apiFetch(baseUrl + '/api/budgets?status=closed', { signal: AbortSignal.timeout(5000) });
       if (r.ok) {
         const d = await r.json();
         window._cachedClosedBudgets = d.budgets || [];
@@ -4331,7 +4437,7 @@ window.toggleClosedBudgets = async function(checked) {
 async function prefetchClosedBudgets() {
   if (window._cachedClosedBudgets && window._cachedClosedBudgets.length > 0) return;
   try {
-    const res = await fetch(API_URL + '/api/budgets?status=closed', { signal: AbortSignal.timeout(5000) });
+    const res = await apiFetch(API_URL + '/api/budgets?status=closed', { signal: AbortSignal.timeout(5000) });
     if (res.ok) {
       const data = await res.json();
       window._cachedClosedBudgets = data.budgets || [];
@@ -4559,7 +4665,7 @@ window.downloadFile = async function(category, filename) {
   let lastErr = null;
   for (const url of candidates) {
     try {
-      const res = await fetch(url);
+      const res = await apiFetch(url);
       if (res.ok) {
         const blob = await res.blob();
         // Ambil nama file dari Content-Disposition header kalau ada
@@ -4583,7 +4689,7 @@ window.downloadFile = async function(category, filename) {
 
   // Tampilkan info debug yang berguna
   try {
-    const debugRes = await fetch(API_URL + '/storage/list/' + category);
+    const debugRes = await apiFetch(API_URL + '/storage/list/' + category);
     if (debugRes.ok) {
       const data = await debugRes.json();
       const item = (data.data || []).find(d => d.file === filename || d.judul === filename);
@@ -4707,13 +4813,13 @@ async function initAvatar(modelUrl = 'static/avatars/brunette.glb') {
 
       // Cinematic lighting
       lightAmbientColor: 0x1a1a2e,
-      lightAmbientIntensity: 3,
+      lightAmbientIntensity: 0,
       lightDirectColor: 0xfff0cc,
-      lightDirectIntensity: 8,
+      lightDirectIntensity: 0,
       lightDirectPhi: 1.2,
       lightDirectTheta: 0.6,
       lightSpotColor: 0xffffff,
-      lightSpotIntensity: 3,
+      lightSpotIntensity: 0,
       lightSpotPhi: 0.5,
       lightSpotTheta: Math.PI,
       lightSpotDispersion: 0.8,
@@ -5032,13 +5138,13 @@ let activeVoiceId = 'edge:id-ID-GadisNeural';
 async function loadConfig() {
   try {
     // Fetch config (agent name, tts_enabled, dll)
-    const res = await fetch(API_URL + '/config', { signal: AbortSignal.timeout(4000) });
+    const res = await apiFetch(API_URL + '/config', { signal: AbortSignal.timeout(4000) });
     if (!res.ok) throw new Error('config endpoint error');
     const cfg = await res.json();
 
     // Fetch voice list dari /voices endpoint
     try {
-      const vRes = await fetch(API_URL + '/voices', { signal: AbortSignal.timeout(4000) });
+      const vRes = await apiFetch(API_URL + '/voices', { signal: AbortSignal.timeout(4000) });
       if (vRes.ok) {
         const vData = await vRes.json();
         const sel = document.getElementById('voice-select');
@@ -5100,7 +5206,7 @@ async function playGreeting() {
   if (greetingPlayed) return;   // jangan putar greeting lebih dari sekali
   greetingPlayed = true;
   try {
-    const res = await fetch(`${API_URL}/greeting?voice=${encodeURIComponent(activeVoiceId)}`);
+    const res = await apiFetch(`${API_URL}/greeting?voice=${encodeURIComponent(activeVoiceId)}`);
     if (!res.ok) throw new Error('Server error ' + res.status);
     const data = await res.json();
     appendMsg('bot', data.reply);
@@ -5202,11 +5308,11 @@ async function sendMessage() {
       formData.append('session_id', SESSION_ID);
       formData.append('message', msgText);
       formData.append('file', fileToSend);
-      const res = await fetch(`${API_URL}/chat-with-file`, { method: 'POST', body: formData });
+      const res = await apiFetch(`${API_URL}/chat-with-file`, { method: 'POST', body: formData });
       if (!res.ok) throw new Error('Server error ' + res.status);
       data = await res.json();
     } else {
-      const res = await fetch(`${API_URL}/chat`, {
+      const res = await apiFetch(`${API_URL}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -5337,7 +5443,7 @@ async function sendMessage() {
 
 async function checkServer() {
   try {
-    const res = await fetch(`${API_URL}/skills`, { signal: AbortSignal.timeout(4000) });
+    const res = await apiFetch(`${API_URL}/skills`, { signal: AbortSignal.timeout(4000) });
     if (res.ok) {
       const data = await res.json();
       const count = data.skills ? data.skills.length : 0;
@@ -5969,7 +6075,7 @@ window.markMenuSeen = function(keys) {
 
 async function loadNavBadges() {
   try {
-    const res = await fetch(API_URL + '/storage/summary', { signal: AbortSignal.timeout(4000) });
+    const res = await apiFetch(API_URL + '/storage/summary', { signal: AbortSignal.timeout(4000) });
     if (!res.ok) return;
     const data = await res.json();
     const saved = getSavedCounts();
@@ -5995,7 +6101,7 @@ async function loadNavBadges() {
 
     // Finance — fetch detail
     try {
-      const finRes = await fetch(API_URL + '/storage/list/finance', { signal: AbortSignal.timeout(4000) });
+      const finRes = await apiFetch(API_URL + '/storage/list/finance', { signal: AbortSignal.timeout(4000) });
       if (finRes.ok) {
         const finData = await finRes.json();
         const items = finData.data || [];
@@ -6015,7 +6121,7 @@ async function loadNavBadges() {
 
     // PR badge
     try {
-      const prRes = await fetch(API_URL + '/storage/list/pr', { signal: AbortSignal.timeout(4000) });
+      const prRes = await apiFetch(API_URL + '/storage/list/pr', { signal: AbortSignal.timeout(4000) });
       if (prRes.ok) {
         const prData = await prRes.json();
         const prCount = (prData.data || []).length;
@@ -6026,7 +6132,7 @@ async function loadNavBadges() {
 
     // PO badge
     try {
-      const poRes = await fetch(API_URL + '/storage/list/po', { signal: AbortSignal.timeout(4000) });
+      const poRes = await apiFetch(API_URL + '/storage/list/po', { signal: AbortSignal.timeout(4000) });
       if (poRes.ok) {
         const poData = await poRes.json();
         const poCount = (poData.data || []).length;
@@ -6037,7 +6143,7 @@ async function loadNavBadges() {
 
     // QT badge
     try {
-      const qtRes = await fetch(API_URL + '/storage/list/qt', { signal: AbortSignal.timeout(4000) });
+      const qtRes = await apiFetch(API_URL + '/storage/list/qt', { signal: AbortSignal.timeout(4000) });
       if (qtRes.ok) {
         const qtData = await qtRes.json();
         const qtCount = (qtData.data || []).length;
@@ -6048,7 +6154,7 @@ async function loadNavBadges() {
 
     // INV badge — hitung yang belum paid (draft + issued)
     try {
-      const invRes = await fetch(API_URL + '/storage/list/inv', { signal: AbortSignal.timeout(4000) });
+      const invRes = await apiFetch(API_URL + '/storage/list/inv', { signal: AbortSignal.timeout(4000) });
       if (invRes.ok) {
         const invData = await invRes.json();
         const invItems = invData.data || [];
@@ -6060,7 +6166,7 @@ async function loadNavBadges() {
 
     // BUDGET badge — hitung yang near limit atau over budget
     try {
-      const budRes = await fetch(API_URL + '/api/budgets/alerts?threshold=80', { signal: AbortSignal.timeout(4000) });
+      const budRes = await apiFetch(API_URL + '/api/budgets/alerts?threshold=80', { signal: AbortSignal.timeout(4000) });
       if (budRes.ok) {
         const budData = await budRes.json();
         const alertCount = budData.total || 0;
@@ -6146,7 +6252,7 @@ async function closeBudgetDirect(budgetId, budgetName, linksCount) {
   // Tidak ada links — langsung close tanpa konfirmasi apapun
 
   try {
-    const res = await fetch(`${baseUrl}/api/budgets/${budgetId}/close`, {
+    const res = await apiFetch(`${baseUrl}/api/budgets/${budgetId}/close`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
     });
@@ -6281,7 +6387,7 @@ async function loadAnalytics() {
 
   try {
     const baseUrl = (typeof API_URL !== 'undefined' ? API_URL : window.location.origin);
-    const res  = await fetch(`${baseUrl}/api/analytics/summary?bulan=${bulan}&tahun=${tahun}`, { signal: AbortSignal.timeout(8000) });
+    const res  = await apiFetch(`${baseUrl}/api/analytics/summary?bulan=${bulan}&tahun=${tahun}`, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
 

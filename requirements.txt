@@ -23,3 +23,6 @@ Pillow>=10.0.0
 
 # ── Utilities ────────────────────────────────────────────────
 python-dateutil>=2.8.0
+python-jose[cryptography]
+passlib[bcrypt]
+bcrypt==4.0.1
