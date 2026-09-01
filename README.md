@@ -7,10 +7,10 @@ Template base untuk semua Holomoc AI Agent. Fork repo ini untuk membuat agent ba
 | Agent | Nama | Port | Subdomain | Status |
 |-------|------|------|-----------|--------|
 | Admin | Ola  | 8080 | ola.holomoc.com | ✅ Running |
-| Finance | Eva | 8081 | finance.holomoc.com | 🔜 Planned |
+| Finance | Eva | 8081 | eva.holomoc.com | ✅ Running |
 | Customer Support | Ona | 8082 | cs.holomoc.com | 🔜 Planned |
 | Marketing | Ray | 8083 | marketing.holomoc.com | 🔜 Planned |
-| Legal | Rea | 8084 | legal.holomoc.com | 🔜 Planned |
+| Legal | Rea | 8084 | rea.holomoc.com | 🔜 Planned |
 
 ## Cara Membuat Agent Baru
 
