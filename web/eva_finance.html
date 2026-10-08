@@ -5458,6 +5458,8 @@ async function checkServer() {
 
 // ============================================================
 // MIC — Web Speech API (Toggle mode, Bahasa Indonesia)
+// v2: diagnostik device mic + level meter, stop TTS saat mic aktif,
+//     batas auto-restart saat no-speech
 // ============================================================
 let recognition      = null;
 let micActive        = false;
@@ -5465,6 +5467,65 @@ let micFinalText     = '';
 let micInterimText   = '';
 let micStoppedByUser = false;
 let micSilenceTimer  = null;
+let micNoSpeechCount = 0;          // berapa kali no-speech berturut-turut
+const MIC_MAX_NO_SPEECH = 2;       // setelah ini, mic berhenti sendiri
+
+// ── Level meter: cek apakah mic benar-benar menangkap suara ──
+let micStream     = null;
+let micAudioCtx   = null;
+let micLevelRaf   = null;
+let micPeakLevel  = 0;
+let micLevelTimer = null;
+
+async function startMicLevelMonitor() {
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const track = micStream.getAudioTracks()[0];
+    console.log('[Mic] Device dipakai:', track ? track.label : '(tidak diketahui)');
+
+    micAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const src      = micAudioCtx.createMediaStreamSource(micStream);
+    const analyser = micAudioCtx.createAnalyser();
+    analyser.fftSize = 512;
+    src.connect(analyser);
+    const buf = new Uint8Array(analyser.fftSize);
+    micPeakLevel = 0;
+
+    const tick = () => {
+      analyser.getByteTimeDomainData(buf);
+      let max = 0;
+      for (let i = 0; i < buf.length; i++) {
+        const v = Math.abs(buf[i] - 128);
+        if (v > max) max = v;
+      }
+      if (max > micPeakLevel) micPeakLevel = max;
+      micLevelRaf = requestAnimationFrame(tick);
+    };
+    tick();
+
+    // Setelah 4 detik, kalau level nyaris nol → device salah / mic mute
+    micLevelTimer = setTimeout(() => {
+      console.log('[Mic] Peak level 4 detik pertama:', micPeakLevel);
+      if (micActive && micPeakLevel < 4) {
+        const label = track ? track.label : 'device default';
+        showMicToast('⚠️ Mic tidak menangkap suara (' + label + '). Cek device input di pengaturan situs.');
+        console.warn('[Mic] Level hampir nol. Kemungkinan device salah / mute:', label);
+      }
+    }, 4000);
+  } catch (e) {
+    console.warn('[Mic] getUserMedia gagal:', e.name, e.message);
+    if (e.name === 'NotAllowedError') showMicToast('⚠️ Akses mikrofon ditolak. Izinkan di browser.');
+    else if (e.name === 'NotFoundError') showMicToast('⚠️ Tidak ada mikrofon terdeteksi.');
+  }
+}
+
+function stopMicLevelMonitor() {
+  clearTimeout(micLevelTimer);
+  if (micLevelRaf) cancelAnimationFrame(micLevelRaf);
+  micLevelRaf = null;
+  if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+  if (micAudioCtx) { try { micAudioCtx.close(); } catch(e) {} micAudioCtx = null; }
+}
 
 function initSpeechRecognition() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -5481,16 +5542,14 @@ function initSpeechRecognition() {
   rec.maxAlternatives  = 1;
 
   rec.onstart = () => {
-    micActive       = true;
-    micFinalText    = '';
-    micInterimText  = '';
-    micStoppedByUser = false;
+    micActive = true;
     updateMicUI(true);
     showMicToast('🎤 Mendengarkan...');
-    showTranscriptBar('Mendengarkan...');
+    showTranscriptBar(micFinalText || 'Mendengarkan...');
   };
 
   rec.onresult = (e) => {
+    micNoSpeechCount = 0;   // ada suara → reset counter
     let interim = '';
     let final   = '';
     for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -5514,42 +5573,57 @@ function initSpeechRecognition() {
   };
 
   rec.onerror = (e) => {
+    if (e.error === 'no-speech') {
+      micNoSpeechCount++;
+      console.log('[Mic] no-speech (' + micNoSpeechCount + '/' + MIC_MAX_NO_SPEECH + ')');
+      if (micNoSpeechCount >= MIC_MAX_NO_SPEECH && !micFinalText) {
+        // Berhenti, jangan restart terus-menerus tanpa hasil
+        micActive = false;
+        const hint = micPeakLevel < 4
+          ? 'Mic tidak menangkap suara. Cek device input.'
+          : 'Tidak ada ucapan terdeteksi. Coba lagi.';
+        showMicToast('🔇 ' + hint);
+      }
+      return;
+    }
+    if (e.error === 'aborted') return;
     console.warn('[Mic] Error:', e.error);
     const msgs = {
-      'not-allowed': 'Akses mikrofon ditolak. Izinkan di browser.',
-      'no-speech':   null,  // abaikan — restart otomatis
-      'network':     'Error jaringan saat speech recognition.',
-      'aborted':     null,
+      'not-allowed':         'Akses mikrofon ditolak. Izinkan di browser.',
+      'service-not-allowed': 'Speech service diblokir browser. Gunakan Chrome/Edge.',
+      'audio-capture':       'Mikrofon tidak ditemukan / dipakai aplikasi lain.',
+      'network':             'Error jaringan saat speech recognition.',
     };
-    const msg = msgs[e.error];
-    if (msg) showMicToast('⚠️ ' + msg);
+    micActive = false;
+    showMicToast('⚠️ ' + (msgs[e.error] || ('Error: ' + e.error)));
   };
 
   rec.onend = () => {
     if (micStoppedByUser) {
-      // User klik stop — kirim apapun yang ada (final atau interim)
+      // User klik stop / silence timer — kirim apapun yang ada
       const text = (micFinalText + ' ' + micInterimText).trim();
       micStoppedByUser = false;
       stopMicUI();
+      hideTranscriptBar();
       if (text) {
+        hideMicToast();
         chatInput.value = text;
         autoResize(chatInput);
-        hideMicToast();
-        hideTranscriptBar();
         setTimeout(() => {
           sendMessage();
           micFinalText   = '';
           micInterimText = '';
         }, 100);
-      } else {
-        hideMicToast();
-        hideTranscriptBar();
       }
     } else if (micActive) {
-      // Timeout browser — restart otomatis
-      try { rec.start(); } catch(e) {}
+      // Timeout browser — restart otomatis (beri jeda supaya tidak InvalidStateError)
+      setTimeout(() => {
+        if (!micActive) return;
+        try { rec.start(); } catch(e) { console.warn('[Mic] Restart gagal:', e); stopMicUI(); hideTranscriptBar(); }
+      }, 250);
     } else {
       stopMicUI();
+      hideTranscriptBar();
     }
   };
 
@@ -5561,9 +5635,16 @@ window.toggleMic = function() {
   if (!recognition) return;
 
   if (!micActive) {
-    micFinalText    = '';
-    micInterimText  = '';
+    // Hentikan Eva bicara dulu — supaya suara speaker tidak tumpang tindih dengan mic
+    try { stopCurrentAudio(); setStatus(''); } catch(e) {}
+
+    micFinalText     = '';
+    micInterimText   = '';
     micStoppedByUser = false;
+    micNoSpeechCount = 0;
+    micActive        = true;   // set di sini supaya onend tahu ini sesi aktif
+    updateMicUI(true);
+    startMicLevelMonitor();
     try { recognition.start(); } catch(e) { console.warn('[Mic] Start error:', e); }
   } else {
     // Set flag SEBELUM stop — onend akan handle pengiriman
@@ -5590,7 +5671,6 @@ function updateMicUI(active) {
   if (!fab || !icon) return;
   if (active) {
     fab.classList.add('listening');
-    // Ganti icon ke stop
     icon.innerHTML = `<rect x="6" y="6" width="12" height="12" rx="2"/>`;
     fab.title = 'Klik untuk berhenti & kirim';
   } else {
@@ -5602,6 +5682,8 @@ function updateMicUI(active) {
 
 function stopMicUI() {
   micActive = false;
+  clearTimeout(micSilenceTimer);
+  stopMicLevelMonitor();
   updateMicUI(false);
 }
 
@@ -5610,8 +5692,7 @@ function showMicToast(msg) {
   if (!el) return;
   el.textContent = msg; el.classList.add('visible');
   clearTimeout(el._timer);
-  // Auto sembunyi setelah 3 detik kalau tidak listening
-  if (!micActive) el._timer = setTimeout(() => el.classList.remove('visible'), 3000);
+  el._timer = setTimeout(() => { if (!micActive) el.classList.remove('visible'); }, 4000);
 }
 
 function hideMicToast() {
